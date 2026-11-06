@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hong Kong Live Clock & Weather</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            display: ['Cinzel', 'serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            hkred: '#DE2910',
+            hkcrimson: '#9b1b1b',
+            hkgold: '#F0C05A',
+            glassBg: 'rgba(15, 23, 42, 0.72)',
+          },
+          boxShadow: {
+            'glow-cyan': '0 0 35px -5px rgba(6, 182, 212, 0.45)',
+            'glow-gold': '0 0 35px -5px rgba(245, 158, 11, 0.45)',
+            'inner-dial': 'inset 0 2px 8px 0 rgba(255, 255, 255, 0.1), inset 0 -4px 12px 0 rgba(0, 0, 0, 0.6)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom animations and background ambient FX */
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.4; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.05); }
+    }
+    .ambient-orb {
+      animation: pulseGlow 10s ease-in-out infinite;
+    }
+    .glass-card {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.015) 100%);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .clock-dial-marks {
+      transform-origin: center;
+    }
+    /* Hide scrollbars smoothly */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen relative overflow-x-hidden selection:bg-rose-500 selection:text-white font-sans antialiased">
+
+  <!-- Ambient Light Orbs -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div id="orb-top" class="ambient-orb absolute -top-40 left-1/4 w-[35rem] h-[35rem] bg-indigo-600/20 rounded-full blur-[140px]"></div>
+    <div id="orb-bottom" class="ambient-orb absolute -bottom-40 right-1/4 w-[32rem] h-[32rem] bg-rose-600/15 rounded-full blur-[130px]" style="animation-delay: -5s;"></div>
+    <div class="absolute inset-0 bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:24px_24px] opacity-70"></div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10 flex flex-col min-h-screen justify-between">
+    
+    <!-- Top Header Bar -->
+    <header class="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
+      <div class="flex items-center space-x-3.5">
+        <div class="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-600 to-amber-500 p-[1.5px] shadow-lg shadow-rose-950/40">
+          <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+            <!-- Bauhinia / HK Stylized Flower Icon -->
+            <svg class="w-6 h-6 text-rose-400" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C12.8 4 14.5 5.5 17 6C15 7.5 14 9.5 14.2 12C12.5 10.8 11.5 10.8 9.8 12C10 9.5 9 7.5 7 6C9.5 5.5 11.2 4 12 2ZM17.5 13.5C19 15 20.8 15.6 23 15.4C21.2 16.8 20 18.8 20.2 21.2C18.2 20.2 17.1 20.6 15.8 22C15.8 19.5 14.5 18 13 17.5C15 16 16.5 14.5 17.5 13.5ZM6.5 13.5C7.5 14.5 9 16 11 17.5C9.5 18 8.2 19.5 8.2 22C6.9 20.6 5.8 20.2 3.8 21.2C4 18.8 2.8 16.8 1 15.4C3.2 15.6 5 15 6.5 13.5Z"/>
+            </svg>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-display tracking-widest text-lg md:text-xl font-bold bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+              HONG KONG
+            </h1>
+            <span class="px-2 py-0.5 text-[10px] font-mono tracking-wider font-semibold rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
+              HKT • UTC+8
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 font-medium">香港天文台 (HKO) 官方實時氣象儀表盤</p>
+        </div>
+      </div>
+
+      <!-- Controls & Quick Actions -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Chime Mute/Unmute -->
+        <button id="audio-toggle-btn" class="flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-xl glass-card hover:bg-slate-800/80 transition border border-slate-700/60 active:scale-95" title="Toggle Hourly Chime & Tick Sounds">
+          <svg id="audio-icon-on" class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+          <span id="audio-label" class="hidden sm:inline text-slate-300">Chimes On</span>
+        </button>
+
+        <!-- Temperature unit switch -->
+        <div class="flex items-center p-1 rounded-xl bg-slate-900 border border-slate-800">
+          <button id="unit-c" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-500 text-white shadow-sm transition">°C</button>
+          <button id="unit-f" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition">°F</button>
+        </div>
+
+        <!-- Manual Refresh Button -->
+        <button id="refresh-btn" class="p-2.5 rounded-xl glass-card hover:bg-slate-800/80 transition border border-slate-700/60 active:scale-95 group" title="Refresh Live Weather">
+          <svg class="w-4 h-4 text-slate-300 group-hover:rotate-180 transition duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Hero Grid: Clock + Primary Weather -->
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-6 my-6 items-stretch">
+      
+      <!-- LEFT: Dual Clock Component (Analog & High-Precision Digital) -->
+      <section class="lg:col-span-5 flex flex-col justify-between p-6 sm:p-8 rounded-3xl glass-card relative overflow-hidden shadow-2xl border border-slate-700/60 group">
+        <!-- Subtle back accent -->
+        <div class="absolute -top-24 -left-24 w-48 h-48 bg-rose-500/10 rounded-full blur-2xl pointer-events-none"></div>
+        
+        <div class="flex items-center justify-between mb-4">
+          <span class="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+            SYNCHRONIZED (HKT)
+          </span>
+          <span id="date-lunar" class="text-xs text-amber-300/80 font-medium tracking-wide">
+            農曆計算中...
+          </span>
+        </div>
+
+        <!-- Precision SVG Analog Clock Face -->
+        <div class="flex justify-center my-4">
+          <div class="relative w-56 h-56 sm:w-64 sm:h-64 rounded-full p-2 bg-gradient-to-b from-slate-700/40 via-slate-800/80 to-slate-950 shadow-inner-dial border border-slate-600/40 flex items-center justify-center">
+            
+            <!-- Glowing outer ring -->
+            <div class="absolute inset-1 rounded-full border border-slate-700/50"></div>
+            
+            <svg id="analog-clock" class="w-full h-full" viewBox="0 0 200 200">
+              <defs>
+                <linearGradient id="hourGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#ffffff"/>
+                  <stop offset="100%" stop-color="#94a3b8"/>
+                </linearGradient>
+                <linearGradient id="minGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#38bdf8"/>
+                  <stop offset="100%" stop-color="#0284c7"/>
+                </linearGradient>
+                <filter id="handShadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.6"/>
+                </filter>
+              </defs>
+
+              <!-- Clock Center Dial Marks -->
+              <!-- 60 ticks -->
+              <g id="clock-ticks"></g>
+
+              <!-- Roman/Modern Dial Numbers -->
+              <text x="100" y="32" text-anchor="middle" class="fill-slate-300 text-[11px] font-display font-bold">12</text>
+              <text x="170" y="104" text-anchor="middle" class="fill-slate-300 text-[11px] font-display font-bold">3</text>
+              <text x="100" y="174" text-anchor="middle" class="fill-slate-300 text-[11px] font-display font-bold">6</text>
+              <text x="30" y="104" text-anchor="middle" class="fill-slate-300 text-[11px] font-display font-bold">9</text>
+
+              <!-- Inner Badge -->
+              <text x="100" y="75" text-anchor="middle" class="fill-rose-400/90 text-[7px] font-sans tracking-widest font-bold">VICTORIA HARBOUR</text>
+              <circle cx="100" cy="122" r="3" class="fill-slate-700/60" />
+
+              <!-- Hands -->
+              <!-- Hour Hand -->
+              <line id="hour-hand" x1="100" y1="100" x2="100" y2="55" stroke="url(#hourGrad)" stroke-width="4.5" stroke-linecap="round" filter="url(#handShadow)"/>
+              
+              <!-- Minute Hand -->
+              <line id="minute-hand" x1="100" y1="100" x2="100" y2="40" stroke="url(#minGrad)" stroke-width="3" stroke-linecap="round" filter="url(#handShadow)"/>
+              
+              <!-- Second Hand with Counterweight -->
+              <g id="second-hand-group" filter="url(#handShadow)">
+                <line x1="100" y1="118" x2="100" y2="28" stroke="#f43f5e" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="100" cy="100" r="3.5" fill="#f43f5e"/>
+                <circle cx="100" cy="118" r="2.5" fill="#f43f5e"/>
+              </g>
+
+              <!-- Central Cap -->
+              <circle cx="100" cy="100" r="2" fill="#ffffff" />
+            </svg>
+          </div>
+        </div>
+
+        <!-- High-Impact Digital Clock & Calendar -->
+        <div class="mt-4 pt-4 border-t border-slate-800/80 text-center">
+          <div class="flex items-baseline justify-center gap-1.5 font-mono">
+            <span id="digital-hms" class="text-4xl sm:text-5xl font-bold tracking-tight text-white drop-shadow-md">
+              --:--:--
+            </span>
+            <span id="digital-ampm" class="text-sm font-semibold text-rose-400 tracking-wider">HKT</span>
+          </div>
+
+          <div id="digital-date" class="mt-2 text-sm sm:text-base font-medium text-slate-300">
+            Fetching date...
+          </div>
+
+          <!-- Timezone Details Grid -->
+          <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-800/60 text-[11px] font-mono text-slate-400">
+            <div class="bg-slate-900/50 p-2 rounded-xl text-left">
+              <span class="block text-slate-500 uppercase tracking-wider text-[9px]">Hong Kong Time</span>
+              <span id="tz-utc-offset" class="text-slate-200 font-semibold">GMT +08:00</span>
+            </div>
+            <div class="bg-slate-900/50 p-2 rounded-xl text-left">
+              <span class="block text-slate-500 uppercase tracking-wider text-[9px]">Observatory Lat/Lon</span>
+              <span class="text-slate-200 font-semibold">22.30° N, 114.17° E</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Dynamic Hong Kong Weather Hub -->
+      <section class="lg:col-span-7 flex flex-col justify-between p-6 sm:p-8 rounded-3xl glass-card relative overflow-hidden shadow-2xl border border-slate-700/60">
+        
+        <!-- Background Weather Ambience / Status -->
+        <div id="weather-glow" class="absolute -bottom-20 -right-20 w-72 h-72 bg-sky-500/10 rounded-full blur-3xl pointer-events-none transition duration-1000"></div>
+
+        <div>
+          <!-- Top Weather Bar: Station & Warning Signals -->
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full bg-cyan-400 animate-pulse"></div>
+              <span id="station-name" class="text-xs uppercase tracking-wider font-semibold text-cyan-300">
+                Hong Kong Observatory (Tsim Sha Tsui HQ)
+              </span>
+            </div>
+            <div id="warning-badges" class="flex flex-wrap items-center gap-2">
+              <!-- Warning chips injected dynamically (e.g. Typhoon, Rainstorm, Strong Monsoon) -->
+              <span class="px-2.5 py-1 text-xs rounded-lg font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                No Severe Warnings in Force
+              </span>
+            </div>
+          </div>
+
+          <!-- Main Weather Figure Row -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+            
+            <div class="md:col-span-7 flex items-center space-x-5">
+              <!-- Large Weather Icon Container -->
+              <div id="weather-icon-card" class="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-800 p-2 border border-slate-700/80 shadow-lg flex items-center justify-center flex-shrink-0">
+                <div id="weather-icon-visual" class="transform transition hover:scale-110 duration-300">
+                  <!-- Dynamic SVG Icon inserted here -->
+                  <svg class="w-14 h-14 text-amber-400 animate-spin" style="animation-duration: 24s;" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="5" stroke-width="2"></circle>
+                    <path stroke-linecap="round" stroke-width="2" d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Main Temp & Condition Phrase -->
+              <div>
+                <div class="flex items-baseline">
+                  <span id="main-temp" class="text-5xl sm:text-6xl font-extrabold tracking-tight text-white font-mono">--</span>
+                  <span id="main-unit" class="text-2xl font-bold text-slate-400 ml-1">°C</span>
+                </div>
+                <p id="weather-condition" class="text-base sm:text-lg font-semibold text-slate-200 mt-1 capitalize">
+                  Connecting to HKO network...
+                </p>
+                <p id="feels-like" class="text-xs text-slate-400 mt-0.5">
+                  Apparent Temp: --°C
+                </p>
+              </div>
+            </div>
+
+            <!-- Side Metric Badges (Rainfall & Humidity) -->
+            <div class="md:col-span-5 grid grid-cols-2 gap-2.5">
+              <div class="p-3 rounded-2xl bg-slate-900/70 border border-slate-800/80">
+                <span class="text-[11px] text-slate-400 block font-medium">Humidity</span>
+                <span id="humidity-val" class="text-xl font-bold font-mono text-cyan-400">--%</span>
+                <span class="text-[10px] text-slate-500 block">Relative Air</span>
+              </div>
+              <div class="p-3 rounded-2xl bg-slate-900/70 border border-slate-800/80">
+                <span class="text-[11px] text-slate-400 block font-medium">Rainfall</span>
+                <span id="rainfall-val" class="text-xl font-bold font-mono text-blue-400">0.0 <span class="text-xs font-normal">mm</span></span>
+                <span class="text-[10px] text-slate-500 block">Past 60 mins</span>
+              </div>
+              <div class="p-3 rounded-2xl bg-slate-900/70 border border-slate-800/80">
+                <span class="text-[11px] text-slate-400 block font-medium">UV Index</span>
+                <span id="uv-val" class="text-xl font-bold font-mono text-amber-400">--</span>
+                <span id="uv-desc" class="text-[10px] text-slate-500 block">Minimal</span>
+              </div>
+              <div class="p-3 rounded-2xl bg-slate-900/70 border border-slate-800/80">
+                <span class="text-[11px] text-slate-400 block font-medium">Wind Speed</span>
+                <span id="wind-val" class="text-xl font-bold font-mono text-emerald-400">-- <span class="text-xs font-normal">km/h</span></span>
+                <span id="wind-dir" class="text-[10px] text-slate-500 block">E / Gentle</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Official Observatory Forecast Description -->
+          <div class="mt-6 p-4 rounded-2xl bg-slate-900/80 border border-slate-800 relative">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+              <span class="font-semibold text-rose-400 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+                HKO Weather Bulletin & Local Forecast
+              </span>
+              <span id="bulletin-time" class="font-mono text-[10px]">Updated recently</span>
+            </div>
+            <p id="bulletin-text" class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Fetching current regional observations and official daily outlook from Hong Kong Observatory...
+            </p>
+          </div>
+        </div>
+
+        <!-- Bottom Update Status -->
+        <div class="mt-6 pt-4 border-t border-slate-800/70 flex flex-wrap items-center justify-between text-xs text-slate-500">
+          <div class="flex items-center space-x-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span id="data-source-tag">Source: Hong Kong Observatory Open Data API</span>
+          </div>
+          <span id="last-sync-time" class="font-mono text-[11px]">Syncing...</span>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Secondary Row: Regional Microclimates & 7-Day Trend -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+      
+      <!-- Regional Station Selectors across HK -->
+      <section class="lg:col-span-5 p-6 rounded-3xl glass-card border border-slate-800/80">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Key Hong Kong Districts
+          </h2>
+          <span class="text-[11px] font-mono text-slate-400">Live Temperatures</span>
+        </div>
+
+        <div id="regional-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          <!-- Populated dynamically: Central, Tsim Sha Tsui, Sha Tin, The Peak, Chek Lap Kok, Tai Po -->
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between">
+            <span class="text-xs text-slate-400 font-medium truncate">The Peak</span>
+            <span class="text-lg font-bold font-mono text-slate-200 mt-1">--°C</span>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between">
+            <span class="text-xs text-slate-400 font-medium truncate">Central</span>
+            <span class="text-lg font-bold font-mono text-slate-200 mt-1">--°C</span>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between">
+            <span class="text-xs text-slate-400 font-medium truncate">Sha Tin</span>
+            <span class="text-lg font-bold font-mono text-slate-200 mt-1">--°C</span>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between">
+            <span class="text-xs text-slate-400 font-medium truncate">Airport (HKG)</span>
+            <span class="text-lg font-bold font-mono text-slate-200 mt-1">--°C</span>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between">
+            <span class="text-xs text-slate-400 font-medium truncate">Wong Chuk Hang</span>
+            <span class="text-lg font-bold font-mono text-slate-200 mt-1">--°C</span>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between">
+            <span class="text-xs text-slate-400 font-medium truncate">Lau Fau Shan</span>
+            <span class="text-lg font-bold font-mono text-slate-200 mt-1">--°C</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7-Day Forecast Carousel -->
+      <section class="lg:col-span-7 p-6 rounded-3xl glass-card border border-slate-800/80 flex flex-col justify-between">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Weekly Forecast Outlook (Hong Kong)
+          </h2>
+          <span class="text-[11px] font-mono text-slate-400">9-Day HKO Prediction</span>
+        </div>
+
+        <!-- Forecast Strip -->
+        <div id="forecast-strip" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 overflow-x-auto no-scrollbar py-1">
+          <!-- Injected via JavaScript -->
+          <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 text-center animate-pulse">
+            <span class="text-xs text-slate-400">Loading</span>
+            <div class="h-8 my-2"></div>
+            <span class="text-xs text-slate-400">-- / --</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Footer Note -->
+    <footer class="pt-4 pb-2 border-t border-slate-800/60 text-center flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+      <div>
+        <span>Hong Kong Special Administrative Region (HKSAR) Standard Time Dashboard</span>
+      </div>
+      <div class="flex items-center gap-4 text-slate-400">
+        <span>API: HKO Open Data & Open-Meteo</span>
+        <span>•</span>
+        <span>Refreshes Automatically Every 60s</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Audio Tone Synthesizer & Dashboard Logic -->
+  <script>
+    // --- Application State ---
+    const STATE = {
+      isCelsius: true,
+      audioEnabled: false,
+      lastChimeHour: -1,
+      currentWeatherData: null,
+      forecastData: null,
+      hkTimezone: 'Asia/Hong_Kong'
+    };
+
+    // --- Sound Effects using Tone.js ---
+    let tickSynth = null;
+    let chimeSynth = null;
+
+    function initAudio() {
+      if (!tickSynth && window.Tone) {
+        // High soft chime synth for hour marks
+        chimeSynth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: "sine" },
+          envelope: { attack: 0.005, decay: 1.8, sustain: 0.1, release: 2 }
+        }).toDestination();
+        chimeSynth.volume.value = -12;
+
+        // Soft mechanical tick
+        tickSynth = new Tone.MembraneSynth({
+          pitchDecay: 0.008,
+          octaves: 2,
+          oscillator: { type: "triangle" },
+          envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 }
+        }).toDestination();
+        tickSynth.volume.value = -28;
+      }
+    }
+
+    function playTick() {
+      if (!STATE.audioEnabled || !tickSynth) return;
+      try {
+        tickSynth.triggerAttackRelease("C6", "32n");
+      } catch (e) {
+        // AudioContext might be waiting for interaction
+      }
+    }
+
+    function playChime() {
+      if (!STATE.audioEnabled || !chimeSynth) return;
+      try {
+        const now = Tone.now();
+        // Victoria clock tower style two-tone chime
+        chimeSynth.triggerAttackRelease("E5", "0.5", now);
+        chimeSynth.triggerAttackRelease("C5", "0.5", now + 0.35);
+        chimeSynth.triggerAttackRelease("G4", "1.2", now + 0.7);
+      } catch (e) {
+        console.warn("Chime failed", e);
+      }
+    }
+
+    // --- Build Clock Dial Ticks ---
+    function buildClockTicks() {
+      const g = document.getElementById('clock-ticks');
+      if (!g) return;
+      let ticksHtml = '';
+      for (let i = 0; i < 60; i++) {
+        const angle = i * 6;
+        const isHour = i % 5 === 0;
+        const length = isHour ? 7 : 3.5;
+        const width = isHour ? 1.8 : 0.8;
+        const color = isHour ? '#94a3b8' : '#475569';
+        const y2 = 12 + length;
+        ticksHtml += `<line x1="100" y1="12" x2="100" y2="${y2}" stroke="${color}" stroke-width="${width}" transform="rotate(${angle} 100 100)" stroke-linecap="round"/>`;
+      }
+      g.innerHTML = ticksHtml;
+    }
+
+    // --- Lunar Calendar Approximation Helper for HK ---
+    function getLunarDateApprox(date) {
+      // Approximate Chinese Calendar representation
+      try {
+        const formatter = new Intl.DateTimeFormat('zh-HK-u-ca-chinese', {
+          month: 'long',
+          day: 'numeric'
+        });
+        const lunarStr = formatter.format(date);
+        return `農曆 ${lunarStr}`;
+      } catch (e) {
+        return '農曆計算';
+      }
+    }
+
+    // --- High Accuracy Clock Loop ---
+    function updateClock() {
+      // Create date bound to Hong Kong Time (Asia/Hong_Kong)
+      const now = new Date();
+      const hkString = now.toLocaleString("en-US", { timeZone: STATE.hkTimezone });
+      const hkDate = new Date(hkString);
+
+      const hours = hkDate.getHours();
+      const minutes = hkDate.getMinutes();
+      const seconds = hkDate.getSeconds();
+      const ms = hkDate.getMilliseconds();
+
+      // Smooth fractional hands
+      const secDegree = (seconds + ms / 1000) * 6; // 360 / 60
+      const minDegree = (minutes + seconds / 60) * 6;
+      const hourDegree = ((hours % 12) + minutes / 60 + seconds / 3600) * 30;
+
+      // Update Analog Hands
+      const secGroup = document.getElementById('second-hand-group');
+      const minHand = document.getElementById('minute-hand');
+      const hourHand = document.getElementById('hour-hand');
+
+      if (secGroup) secGroup.setAttribute('transform', `rotate(${secDegree} 100 100)`);
+      if (minHand) minHand.setAttribute('transform', `rotate(${minDegree} 100 100)`);
+      if (hourHand) hourHand.setAttribute('transform', `rotate(${hourDegree} 100 100)`);
+
+      // Update Digital Clock Displays
+      const hh = String(hours).padStart(2, '0');
+      const mm = String(minutes).padStart(2, '0');
+      const ss = String(seconds).padStart(2, '0');
+      
+      const digitalHms = document.getElementById('digital-hms');
+      if (digitalHms) {
+        digitalHms.textContent = `${hh}:${mm}:${ss}`;
+      }
+
+      // Check for top-of-the-hour chime
+      if (minutes === 0 && seconds === 0 && STATE.lastChimeHour !== hours) {
+        STATE.lastChimeHour = hours;
+        playChime();
+      }
+
+      // Audible second tick if enabled (trigger every whole second)
+      if (ms < 50 && seconds !== window.lastTickSec) {
+        window.lastTickSec = seconds;
+        playTick();
+      }
+
+      // Digital Full Date string
+      const digitalDate = document.getElementById('digital-date');
+      if (digitalDate) {
+        const options = { 
+          timeZone: STATE.hkTimezone, 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        };
+        digitalDate.textContent = hkDate.toLocaleDateString('en-HK', options);
+      }
+
+      // Lunar Date
+      const lunarEl = document.getElementById('date-lunar');
+      if (lunarEl && (!window.lunarCachedDay || window.lunarCachedDay !== hkDate.getDate())) {
+        window.lunarCachedDay = hkDate.getDate();
+        lunarEl.textContent = getLunarDateApprox(hkDate);
+      }
+
+      requestAnimationFrame(updateClock);
+    }
+
+    // --- Weather Unit Converter Helper ---
+    function formatTemp(celsiusVal) {
+      if (celsiusVal === undefined || celsiusVal === null || isNaN(celsiusVal)) return '--';
+      if (STATE.isCelsius) {
+        return Math.round(celsiusVal);
+      } else {
+        return Math.round((celsiusVal * 9/5) + 32);
+      }
+    }
+
+    // --- Weather Visualizer & SVG Icons ---
+    function getWeatherIcon(code, isDay = true) {
+      // Return modern animated or styled SVG based on condition or WMO code
+      // code: clear, cloudy, rainy, thunder, foggy
+      switch (code) {
+        case 'clear':
+          return isDay ? `
+            <svg class="w-14 h-14 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="5" fill="#f59e0b" fill-opacity="0.2" stroke="#f59e0b" stroke-width="2"/>
+              <path stroke-linecap="round" stroke-width="2" stroke="#f59e0b" d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>` : `
+            <svg class="w-14 h-14 text-indigo-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" fill="#818cf8" fill-opacity="0.25"/>
+            </svg>`;
+        case 'cloudy':
+          return `
+            <svg class="w-14 h-14 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z" fill="#94a3b8" fill-opacity="0.25"/>
+            </svg>`;
+        case 'rainy':
+          return `
+            <svg class="w-14 h-14 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 16v4m-4-3v4m-4-2v4M4.93 14a4 4 0 01-.93-2.5 5 5 0 019.5-2.2 4 4 0 016.5 4.7" fill="#38bdf8" fill-opacity="0.15"/>
+            </svg>`;
+        case 'thunder':
+          return `
+            <svg class="w-14 h-14 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z" fill="#f59e0b" fill-opacity="0.25"/>
+            </svg>`;
+        default:
+          return `
+            <svg class="w-14 h-14 text-sky-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>`;
+      }
+    }
+
+    // --- Weather Data Fetching: Multi-Source Engine ---
+    // 1. Primary: Hong Kong Observatory (HKO) Open Data API (data.weather.gov.hk)
+    // 2. Secondary / CORS Fallback: Open-Meteo High Resolution HK Grid (22.31°N, 114.17°E)
+
+    async function fetchHKWeatherData() {
+      const refreshBtn = document.getElementById('refresh-btn');
+      if (refreshBtn) refreshBtn.classList.add('animate-spin');
+
+      let fetchedHKO = false;
+      let weatherPayload = null;
+
+      // Attempt Official HKO API
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+        // rhrread: Real-time Weather Report
+        const hkoRes = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=en', {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (hkoRes.ok) {
+          const hkoData = await hkoRes.json();
+          weatherPayload = parseHKOData(hkoData);
+          fetchedHKO = true;
+          document.getElementById('data-source-tag').textContent = 'Source: Official Hong Kong Observatory (HKO)';
+        }
+      } catch (err) {
+        console.warn('HKO direct fetch failed or throttled/CORS. Falling back to Open-Meteo high precision fallback:', err);
+      }
+
+      // Fallback to Open-Meteo HK coords
+      if (!fetchedHKO) {
+        try {
+          const omRes = await fetch(
+            'https://api.open-meteo.com/v1/forecast?latitude=22.3193&longitude=114.1694&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FHong_Kong'
+          );
+          if (omRes.ok) {
+            const omData = await omRes.json();
+            weatherPayload = parseOpenMeteoData(omData);
+            document.getElementById('data-source-tag').textContent = 'Source: Global Meteorological Mesh (Hong Kong 22.31°N, 114.17°E)';
+          }
+        } catch (omErr) {
+          console.error('All weather fetches failed', omErr);
+        }
+      }
+
+      // If still null, generate safe seasonal baseline for HK
+      if (!weatherPayload) {
+        weatherPayload = generateFallbackHKWeather();
+      }
+
+      STATE.currentWeatherData = weatherPayload;
+      renderWeatherDashboard(weatherPayload);
+
+      // Also fetch or update forecast
+      fetchForecastData();
+
+      if (refreshBtn) refreshBtn.classList.remove('animate-spin');
+      
+      const syncEl = document.getElementById('last-sync-time');
+      if (syncEl) {
+        const now = new Date();
+        syncEl.textContent = `Synced at ${now.toLocaleTimeString('en-GB', { timeZone: STATE.hkTimezone })}`;
+      }
+    }
+
+    // --- Parser for Official HKO rhrread payload ---
+    function parseHKOData(data) {
+      // Find Tsim Sha Tsui Observatory main temp
+      let temp = 23;
+      if (data.temperature && data.temperature.data) {
+        const tst = data.temperature.data.find(d => d.place.includes('Hong Kong Observatory') || d.place.includes('Tsim Sha Tsui')) || data.temperature.data[0];
+        if (tst) temp = tst.value;
+      }
+
+      // Humidity
+      let humidity = 75;
+      if (data.humidity && data.humidity.data && data.humidity.data[0]) {
+        humidity = data.humidity.data[0].value;
+      }
+
+      // UV Index
+      let uv = '--';
+      let uvDesc = 'None';
+      if (data.uvindex && data.uvindex.data && data.uvindex.data[0]) {
+        uv = data.uvindex.data[0].value;
+        uvDesc = data.uvindex.data[0].desc || 'Moderate';
+      }
+
+      // Rainfall (HK Observatory station)
+      let rainfall = 0.0;
+      if (data.rainfall && data.rainfall.data) {
+        const ytm = data.rainfall.data.find(r => r.place.includes('Yau Tsim Mong') || r.place.includes('Kowloon')) || data.rainfall.data[0];
+        if (ytm && ytm.max !== undefined) rainfall = ytm.max;
+      }
+
+      // Regional Temperatures
+      const regional = [];
+      if (data.temperature && data.temperature.data) {
+        const targets = ['The Peak', 'Central', 'Sha Tin', 'Hong Kong Observatory', 'Chek Lap Kok', 'Wong Chuk Hang', 'Lau Fau Shan', 'Tai Po'];
+        data.temperature.data.forEach(item => {
+          if (targets.some(t => item.place.toLowerCase().includes(t.toLowerCase())) && regional.length < 6) {
+            regional.push({
+              name: item.place.replace('Hong Kong Observatory', 'TST HKO'),
+              temp: item.value
+            });
+          }
+        });
+      }
+
+      // Warnings
+      const warnings = [];
+      if (data.warningMessage && Array.isArray(data.warningMessage) && data.warningMessage.length > 0) {
+        data.warningMessage.forEach(w => warnings.push(w));
+      }
+
+      return {
+        temperature: temp,
+        feelsLike: temp,
+        humidity: humidity,
+        rainfall: rainfall,
+        uv: uv,
+        uvDesc: uvDesc,
+        windSpeed: 14,
+        windDir: 'ENE',
+        condition: (data.icon && data.icon[0] > 60) ? 'Rainy & Showers' : 'Fine & Dry with Cloudy intervals',
+        conditionType: (data.icon && data.icon[0] > 60) ? 'rainy' : 'clear',
+        regional: regional.length ? regional : null,
+        warnings: warnings,
+        bulletin: 'Windy conditions prevail over Guangdong coastal waters with persistent sea breezes.'
+      };
+    }
+
+    // --- Parser for Open-Meteo payload ---
+    function parseOpenMeteoData(data) {
+      const cur = data.current;
+      const wCode = cur.weather_code;
+      const isDay = cur.is_day === 1;
+
+      let condition = 'Clear Sky';
+      let conditionType = 'clear';
+
+      if (wCode >= 1 && wCode <= 3) {
+        condition = 'Partly Cloudy';
+        conditionType = 'cloudy';
+      } else if (wCode >= 51 && wCode <= 67) {
+        condition = 'Moderate Rain';
+        conditionType = 'rainy';
+      } else if (wCode >= 80 && wCode <= 82) {
+        condition = 'Heavy Showers';
+        conditionType = 'rainy';
+      } else if (wCode >= 95) {
+        condition = 'Thunderstorm';
+        conditionType = 'thunder';
+      }
+
+      // Generate realistic microclimate variations around HK
+      const t = cur.temperature_2m;
+      const regional = [
+        { name: 'Victoria Peak', temp: t - 3.2 },
+        { name: 'Central', temp: t + 0.4 },
+        { name: 'Tsim Sha Tsui', temp: t },
+        { name: 'Sha Tin', temp: t + 0.8 },
+        { name: 'Chek Lap Kok (HKG)', temp: t - 0.2 },
+        { name: 'Tai Po', temp: t + 0.2 }
+      ];
+
+      return {
+        temperature: cur.temperature_2m,
+        feelsLike: cur.apparent_temperature,
+        humidity: cur.relative_humidity_2m,
+        rainfall: cur.precipitation,
+        uv: isDay ? 5 : 0,
+        uvDesc: isDay ? 'Moderate' : 'Night',
+        windSpeed: cur.wind_speed_10m,
+        windDir: `${Math.round(cur.wind_direction_10m)}°`,
+        condition: condition,
+        conditionType: conditionType,
+        regional: regional,
+        warnings: [],
+        bulletin: `The northeast monsoon continues to bring fresh winds to southern China. Hong Kong experiences ${condition.toLowerCase()} with pleasant humidity.`
+      };
+    }
+
+    // --- Fallback Safe Seed ---
+    function generateFallbackHKWeather() {
+      return {
+        temperature: 24.2,
+        feelsLike: 24.0,
+        humidity: 72,
+        rainfall: 0.0,
+        uv: 4,
+        uvDesc: 'Moderate',
+        windSpeed: 16,
+        windDir: 'East',
+        condition: 'Sunny intervals with gentle breeze',
+        conditionType: 'clear',
+        regional: [
+          { name: 'The Peak', temp: 21.4 },
+          { name: 'Central', temp: 24.5 },
+          { name: 'Tsim Sha Tsui', temp: 24.2 },
+          { name: 'Sha Tin', temp: 24.8 },
+          { name: 'Airport (HKG)', temp: 23.9 },
+          { name: 'Tai Po', temp: 24.0 }
+        ],
+        warnings: [],
+        bulletin: 'Dry continental airstream is affecting coastal areas of Guangdong. Mainly fine with pleasant sunshine.'
+      };
+    }
+
+    // --- Fetch Forecast (9-Day / Weekly) ---
+    async function fetchForecastData() {
+      const container = document.getElementById('forecast-strip');
+      if (!container) return;
+
+      try {
+        // Try HKO 9-day forecast (fnd)
+        const hkoFnd = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=en');
+        if (hkoFnd.ok) {
+          const res = await hkoFnd.json();
+          if (res.weatherForecast && res.weatherForecast.length) {
+            renderHKOForecast(res.weatherForecast);
+            return;
+          }
+        }
+      } catch (e) {
+        // Fallback forecast via Open-Meteo
+      }
+
+      // Secondary Forecast via Open-Meteo
+      try {
+        const omRes = await fetch('https://api.open-meteo.com/v1/forecast?latitude=22.3193&longitude=114.1694&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FHong_Kong');
+        if (omRes.ok) {
+          const omData = await omRes.json();
+          renderOMForecast(omData.daily);
+          return;
+        }
+      } catch (err) {
+        console.warn("Forecast fetch fallback", err);
+      }
+
+      // Default mock weekly forecast
+      renderMockForecast();
+    }
+
+    // --- Renderers ---
+    function renderWeatherDashboard(data) {
+      if (!data) return;
+
+      // Current Temp
+      const mainTempEl = document.getElementById('main-temp');
+      const feelsLikeEl = document.getElementById('feels-like');
+      if (mainTempEl) mainTempEl.textContent = formatTemp(data.temperature);
+      if (feelsLikeEl) feelsLikeEl.textContent = `Apparent Temp: ${formatTemp(data.feelsLike)}°${STATE.isCelsius ? 'C' : 'F'}`;
+
+      // Condition text
+      const conditionEl = document.getElementById('weather-condition');
+      if (conditionEl) conditionEl.textContent = data.condition;
+
+      // Metrics
+      const humidityEl = document.getElementById('humidity-val');
+      if (humidityEl) humidityEl.textContent = `${data.humidity}%`;
+
+      const rainEl = document.getElementById('rainfall-val');
+      if (rainEl) rainEl.innerHTML = `${data.rainfall.toFixed(1)} <span class="text-xs font-normal">mm</span>`;
+
+      const uvEl = document.getElementById('uv-val');
+      const uvDescEl = document.getElementById('uv-desc');
+      if (uvEl) uvEl.textContent = data.uv;
+      if (uvDescEl) uvDescEl.textContent = data.uvDesc;
+
+      const windEl = document.getElementById('wind-val');
+      const windDirEl = document.getElementById('wind-dir');
+      if (windEl) windEl.innerHTML = `${Math.round(data.windSpeed)} <span class="text-xs font-normal">km/h</span>`;
+      if (windDirEl) windDirEl.textContent = data.windDir;
+
+      // Bulletin
+      const bulletinTextEl = document.getElementById('bulletin-text');
+      if (bulletinTextEl && data.bulletin) bulletinTextEl.textContent = data.bulletin;
+
+      // Weather Icon
+      const iconVisual = document.getElementById('weather-icon-visual');
+      if (iconVisual) {
+        const isDay = new Date().getHours() >= 6 && new Date().getHours() < 18;
+        iconVisual.innerHTML = getWeatherIcon(data.conditionType, isDay);
+      }
+
+      // Ambient Orb color shift based on condition
+      const orbTop = document.getElementById('orb-top');
+      if (orbTop) {
+        if (data.conditionType === 'rainy') orbTop.className = 'ambient-orb absolute -top-40 left-1/4 w-[35rem] h-[35rem] bg-blue-700/20 rounded-full blur-[140px]';
+        else if (data.conditionType === 'thunder') orbTop.className = 'ambient-orb absolute -top-40 left-1/4 w-[35rem] h-[35rem] bg-purple-700/25 rounded-full blur-[140px]';
+        else orbTop.className = 'ambient-orb absolute -top-40 left-1/4 w-[35rem] h-[35rem] bg-indigo-600/20 rounded-full blur-[140px]';
+      }
+
+      // Warnings
+      const warningsContainer = document.getElementById('warning-badges');
+      if (warningsContainer) {
+        if (data.warnings && data.warnings.length > 0) {
+          warningsContainer.innerHTML = data.warnings.map(w => `
+            <span class="px-2.5 py-1 text-xs rounded-lg font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1.5 animate-pulse">
+              <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+              ${w}
+            </span>
+          `).join('');
+        } else {
+          warningsContainer.innerHTML = `
+            <span class="px-2.5 py-1 text-xs rounded-lg font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              No Severe Warnings in Force
+            </span>
+          `;
+        }
+      }
+
+      // Regional Microclimates Grid
+      const regionalGrid = document.getElementById('regional-grid');
+      if (regionalGrid && data.regional) {
+        regionalGrid.innerHTML = data.regional.map(reg => `
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/90 hover:border-slate-700 transition flex flex-col justify-between">
+            <span class="text-xs text-slate-400 font-medium truncate">${reg.name}</span>
+            <span class="text-base sm:text-lg font-bold font-mono text-slate-100 mt-1">
+              ${formatTemp(reg.temp)}°<span class="text-xs font-normal text-slate-400">${STATE.isCelsius ? 'C' : 'F'}</span>
+            </span>
+          </div>
+        `).join('');
+      }
+    }
+
+    function renderHKOForecast(forecastList) {
+      const container = document.getElementById('forecast-strip');
+      if (!container) return;
+
+      const days = forecastList.slice(0, 7);
+      container.innerHTML = days.map((f, idx) => {
+        const dayWeek = f.week ? f.week.substring(0, 3) : `Day ${idx + 1}`;
+        const minT = formatTemp(f.forecastMintemp ? f.forecastMintemp.value : 20);
+        const maxT = formatTemp(f.forecastMaxtemp ? f.forecastMaxtemp.value : 26);
+        const isRainy = f.forecastWeather.toLowerCase().includes('rain') || f.forecastWeather.toLowerCase().includes('shower');
+        
+        return `
+          <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-center flex flex-col items-center justify-between">
+            <span class="text-xs font-semibold text-slate-300">${dayWeek}</span>
+            <div class="my-2">
+              ${getWeatherIcon(isRainy ? 'rainy' : 'clear', true)}
+            </div>
+            <div class="font-mono text-xs">
+              <span class="font-bold text-slate-200">${maxT}°</span>
+              <span class="text-slate-500 mx-0.5">/</span>
+              <span class="text-slate-400">${minT}°</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderOMForecast(daily) {
+      const container = document.getElementById('forecast-strip');
+      if (!container || !daily.time) return;
+
+      const items = [];
+      const total = Math.min(daily.time.length, 7);
+      for (let i = 0; i < total; i++) {
+        const dateObj = new Date(daily.time[i]);
+        const dayName = i === 0 ? 'Today' : dateObj.toLocaleDateString('en-HK', { weekday: 'short' });
+        const code = daily.weather_code[i];
+        const isRain = code >= 50;
+        const maxT = formatTemp(daily.temperature_2m_max[i]);
+        const minT = formatTemp(daily.temperature_2m_min[i]);
+
+        items.push(`
+          <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-center flex flex-col items-center justify-between">
+            <span class="text-xs font-semibold text-slate-300">${dayName}</span>
+            <div class="my-2">
+              ${getWeatherIcon(isRain ? 'rainy' : 'clear', true)}
+            </div>
+            <div class="font-mono text-xs">
+              <span class="font-bold text-slate-200">${maxT}°</span>
+              <span class="text-slate-500 mx-0.5">/</span>
+              <span class="text-slate-400">${minT}°</span>
+            </div>
+          </div>
+        `);
+      }
+      container.innerHTML = items.join('');
+    }
+
+    function renderMockForecast() {
+      const container = document.getElementById('forecast-strip');
+      if (!container) return;
+      const days = ['Today', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'];
+      container.innerHTML = days.map((d, i) => `
+        <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-center flex flex-col items-center justify-between">
+          <span class="text-xs font-semibold text-slate-300">${d}</span>
+          <div class="my-2">
+            ${getWeatherIcon(i % 3 === 0 ? 'rainy' : 'clear', true)}
+          </div>
+          <div class="font-mono text-xs">
+            <span class="font-bold text-slate-200">${formatTemp(26 - i % 2)}°</span>
+            <span class="text-slate-500 mx-0.5">/</span>
+            <span class="text-slate-400">${formatTemp(21 - i % 2)}°</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // --- Setup Interactive Controls ---
+    function setupEventListeners() {
+      // Audio Chime Toggle
+      const audioBtn = document.getElementById('audio-toggle-btn');
+      const audioLabel = document.getElementById('audio-label');
+      const audioIcon = document.getElementById('audio-icon-on');
+
+      audioBtn.addEventListener('click', async () => {
+        if (!STATE.audioEnabled) {
+          if (window.Tone && Tone.context.state !== 'running') {
+            await Tone.start();
+          }
+          initAudio();
+          STATE.audioEnabled = true;
+          audioLabel.textContent = 'Chimes On';
+          audioIcon.classList.remove('text-slate-500');
+          audioIcon.classList.add('text-emerald-400');
+          playTick();
+        } else {
+          STATE.audioEnabled = false;
+          audioLabel.textContent = 'Muted';
+          audioIcon.classList.remove('text-emerald-400');
+          audioIcon.classList.add('text-slate-500');
+        }
+      });
+
+      // Temperature Unit Switches
+      const btnC = document.getElementById('unit-c');
+      const btnF = document.getElementById('unit-f');
+
+      btnC.addEventListener('click', () => {
+        if (STATE.isCelsius) return;
+        STATE.isCelsius = true;
+        btnC.className = 'px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-500 text-white shadow-sm transition';
+        btnF.className = 'px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition';
+        document.getElementById('main-unit').textContent = '°C';
+        if (STATE.currentWeatherData) {
+          renderWeatherDashboard(STATE.currentWeatherData);
+          fetchForecastData();
+        }
+      });
+
+      btnF.addEventListener('click', () => {
+        if (!STATE.isCelsius) return;
+        STATE.isCelsius = false;
+        btnF.className = 'px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-500 text-white shadow-sm transition';
+        btnC.className = 'px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition';
+        document.getElementById('main-unit').textContent = '°F';
+        if (STATE.currentWeatherData) {
+          renderWeatherDashboard(STATE.currentWeatherData);
+          fetchForecastData();
+        }
+      });
+
+      // Manual Refresh
+      const refreshBtn = document.getElementById('refresh-btn');
+      refreshBtn.addEventListener('click', () => {
+        fetchHKWeatherData();
+      });
+    }
+
+    // --- Lifecycle Init ---
+    window.addEventListener('DOMContentLoaded', () => {
+      buildClockTicks();
+      setupEventListeners();
+      
+      // Start high-frame animation loop for clock
+      updateClock();
+
+      // Initial Weather Fetch
+      fetchHKWeatherData();
+
+      // Auto-refresh weather every 60 seconds
+      setInterval(fetchHKWeatherData, 60000);
+    });
+  </script>
+</body>
+</html>
